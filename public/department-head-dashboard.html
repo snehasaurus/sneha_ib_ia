@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Department Head Dashboard</title>
+</head>
+<body style="background-color: #a2c2f4; font-family: Arial, sans-serif;">
+
+  <h1 style="text-align: center; font-size: 32px; margin-top: 20px;">Department Head Dashboard</h1>
+
+  <!-- Table 1: Budget Approval Status -->
+  <h2 style="text-align: center; margin-top: 30px;">BUDGET APPROVAL STATUS</h2>
+  <table border="1" cellpadding="10" style="width: 80%; margin: 20px auto; border-collapse: collapse; text-align: center;">
+    <thead style="background-color: #4b7bec; color: white;">
+      <tr>
+        <th>Department</th>
+        <th>Department Head</th>
+        <th>Amount</th>
+        <th>Approve/Deny</th>
+        <th>Comments</th>
+      </tr>
+    </thead>
+    <tbody id="budget-status-table"></tbody>
+  </table>
+
+  <!-- Table 2: Employee Details -->
+  <h2 style="text-align: center; margin-top: 30px;">EMPLOYEE DETAILS</h2>
+  <table border="1" cellpadding="10" style="width: 80%; margin: 20px auto; border-collapse: collapse; text-align: center;">
+    <thead style="background-color: #4b7bec; color: white;">
+      <tr>
+        <th>Employee Name</th>
+        <th>Employee Department</th>
+        <th>Employee Role</th>
+        <th>Employee Email</th>
+        <th>Edit</th>
+        <th>Remove</th>
+      </tr>
+    </thead>
+    <tbody id="employee-details-table"></tbody>
+  </table>
+
+  <script>
+    let budgetData = [];
+    let employees = [];
+
+    // Fetch Budget Approval Status (only for this department)
+    async function fetchBudgetStatus() {
+      try {
+        const res = await fetch('/api/department-head/budget-status');
+        const data = await res.json();
+        budgetData = data;
+        renderBudgetStatus(data);
+      } catch (err) {
+        console.error('Error fetching budget status:', err);
+      }
+    }
+
+    function renderBudgetStatus(data) {
+      const table = document.getElementById('budget-status-table');
+      table.innerHTML = '';
+      data.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.department_name}</td>
+          <td>${item.department_head}</td>
+          <td>${item.requested_budget}</td>
+          <td>${item.budget_status}</td>
+          <td>${item.admin_comments || '—'}</td>
+        `;
+        table.appendChild(tr);
+      });
+    }
+
+    // Fetch Employees (only those in this department)
+    async function fetchEmployees() {
+      try {
+        const res = await fetch('/api/department-head/employees');
+        const data = await res.json();
+        employees = data;
+        renderEmployees(data);
+      } catch (err) {
+        console.error('Error fetching employees:', err);
+      }
+    }
+
+    function renderEmployees(data) {
+      const table = document.getElementById('employee-details-table');
+      table.innerHTML = '';
+      data.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${user.username}</td>
+          <td>${user.department_name}</td>
+          <td>${user.role}</td>
+          <td>${user.email}</td>
+          <td><button onclick="editUser(${user.id}, '${user.username}', '${user.role}', '${user.email}')">Edit</button></td>
+          <td><button onclick="deleteUser(${user.id})">Remove</button></td>
+        `;
+        table.appendChild(tr);
+      });
+    }
+
+    function editUser(id, username, role, email) {
+      const newUsername = prompt('Edit username:', username);
+      const newRole = prompt('Edit role (admin / General Employee / Department Head):', role);
+      const newEmail = prompt('Edit email:', email);
+
+      if (!newUsername || !newRole || !newEmail) return;
+
+      fetch('/api/department-head/employees/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, username: newUsername, role: newRole, email: newEmail })
+      }).then(() => fetchEmployees());
+    }
+
+    function deleteUser(id) {
+      if (!confirm('Are you sure you want to remove this user?')) return;
+
+      fetch('/api/department-head/employees/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      }).then(() => fetchEmployees());
+    }
+
+    // Initialize
+    fetchBudgetStatus();
+    fetchEmployees();
+  </script>
+</body>
+</html>

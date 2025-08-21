@@ -1,4 +1,4 @@
-
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql');
@@ -32,7 +32,7 @@ app.use((req, res, next) => {
 const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
-    password: 'dog#1008',
+    password: process.env.DB_PASSWORD,
     database: 'LoginDB'
 });
 
@@ -73,8 +73,8 @@ app.post('/login', (req, res) => {
         };
 
         if (user.role === 'admin') return res.redirect('/admin');
-        else if (user.role === 'employee') return res.redirect('/employee-dashboard');
-        else if (user.role === 'manager') return res.redirect('/manager-dashboard');
+        else if (user.role === 'General Employee') return res.redirect('/employee');
+        else if (user.role === 'Department Head') return res.redirect('/department-head');
         else return res.send('Login successful. But no dashboard defined for your role.');
     });
 });
@@ -92,11 +92,12 @@ app.get('/admin-dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin-dashboard.html'));
 });
 
-// ✅ Admin dashboard data route
+//  Admin dashboard data route
 app.get('/admin-dashboard-data', (req, res) => {
     if (req.session.user && req.session.user.role === 'admin') {
         const departmentsQuery = `
-            SELECT department_id, department_name, department_head, requested_budget, admin_comments, budget_status 
+            SELECT department_id, department_name, department_head, requested_budget, admin_comments,
+            budget_status 
             FROM departments
         `;
         const expendituresQuery = `
@@ -274,7 +275,7 @@ app.post('/reset-password', async (req, res) => {
     );
 });
 
-// API for Budget Reports
+//API for Budget Reports (THIS IS WHAT U ADD BACK IF THE CURRENT CODE GOES WRONG)
 app.get('/api/budget-reports-data', (req, res) => {
     const query = `
         SELECT department_id, department_name, department_head, requested_budget, admin_comments, budget_status 
@@ -285,6 +286,10 @@ app.get('/api/budget-reports-data', (req, res) => {
         res.json(results);
     });
 });
+
+
+
+
 
 // API for User Management
 app.get('/api/users', (req, res) => {
@@ -334,7 +339,8 @@ app.post('/api/users/delete', (req, res) => {
 
 
 app.post('/email-budget-report', async (req, res) => {
-  const { department_name, department_head, requested_budget, admin_comments, budget_status } = req.body;
+//   const { department_name, department_head, requested_budget, admin_comments, budget_status } = req.body;
+const { department, pdfBase64 } = req.body;
 
   const username = req.session.user?.username;
   if (!username) {
@@ -391,6 +397,9 @@ app.post('/email-budget-report', async (req, res) => {
   });
 });
 
+
+
+
 app.post('/register-admin', async (req, res) => {
   const { username, password, email } = req.body;
   const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -401,6 +410,153 @@ app.post('/register-admin', async (req, res) => {
     res.send('Admin registered successfully');
   });
 });
+
+
+//Department Head Routes 
+
+app.get('/department-head', (req, res) => {
+    if (req.session.user && req.session.user.role === 'Department Head') {
+        res.sendFile(path.join(__dirname, 'public', 'department-head.html'));
+    } else {
+        res.send('Access denied. Department Heads only.');
+    }
+});
+
+//department head dashboard route
+
+app.get('/department-head-dashboard', (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'Department Head') {
+    return res.status(403).send('Access denied. Department Heads only.');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'department-head-dashboard.html'));
+});
+
+// Helper to resolve the Department Head's department_id
+function getDeptHeadDepartmentId(req, callback) {
+  // If you already store department_id in session, prefer that:
+  if (req.session.user && req.session.user.department_id) {
+    return callback(null, req.session.user.department_id);
+  }
+  // Fallback: look it up from users table using logged-in user's id
+  const q = 'SELECT department_id FROM users WHERE id = ? LIMIT 1';
+  db.query(q, [req.session.user.id], (err, rows) => {
+    if (err) return callback(err);
+    if (!rows || rows.length === 0) return callback(new Error('User not found'));
+    callback(null, rows[0].department_id);
+  });
+}
+
+// ==========================================
+// API: Budget Approval Status (one row only)
+// ==========================================
+app.get('/api/department-head/budget-status', (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'Department Head') {
+    return res.status(403).send('Access denied. Department Heads only.');
+  }
+
+  getDeptHeadDepartmentId(req, (err, departmentId) => {
+    if (err) return res.status(500).send('Error resolving department.');
+
+    const query = `
+      SELECT department_name, department_head, requested_budget, budget_status, admin_comments
+      FROM departments
+      WHERE department_id = ?
+      LIMIT 1
+    `;
+
+    db.query(query, [departmentId], (qErr, results) => {
+      if (qErr) return res.status(500).send('Error fetching budget status.');
+      // Return as an array (client expects array and forEach's it)
+      res.json(results || []);
+    });
+  });
+});
+
+// =======================================
+// API: Employees in this Department only
+// =======================================
+app.get('/api/department-head/employees', (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'Department Head') {
+    return res.status(403).send('Access denied. Department Heads only.');
+  }
+
+  getDeptHeadDepartmentId(req, (err, departmentId) => {
+    if (err) return res.status(500).send('Error resolving department.');
+
+    const query = `
+      SELECT u.id, u.username, u.role, u.email, d.department_name
+      FROM users u
+      JOIN departments d ON u.department_id = d.department_id
+      WHERE u.department_id = ?
+      ORDER BY u.username ASC
+    `;
+
+    db.query(query, [departmentId], (qErr, results) => {
+      if (qErr) return res.status(500).send('Error fetching employees.');
+      res.json(results || []);
+    });
+  });
+});
+
+// ===================================================
+// API: Update a user (only within this department)
+// ===================================================
+app.post('/api/department-head/employees/update', (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'Department Head') {
+    return res.status(403).send('Access denied. Department Heads only.');
+  }
+
+  const { id, username, role, email } = req.body;
+  if (!id || !username || !role || !email) {
+    return res.status(400).send('Missing required fields.');
+  }
+
+  getDeptHeadDepartmentId(req, (err, departmentId) => {
+    if (err) return res.status(500).send('Error resolving department.');
+
+    const query = `
+      UPDATE users
+      SET username = ?, role = ?, email = ?
+      WHERE id = ? AND department_id = ?
+    `;
+    db.query(query, [username, role, email, id, departmentId], (qErr, result) => {
+      if (qErr) return res.status(500).send('Error updating user.');
+      if (result.affectedRows === 0) {
+        return res.status(403).send('Update denied or user not in your department.');
+      }
+      res.sendStatus(200);
+    });
+  });
+});
+
+// ==================================================
+// API: Delete a user (only within this department)
+// ==================================================
+app.post('/api/department-head/employees/delete', (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'Department Head') {
+    return res.status(403).send('Access denied. Department Heads only.');
+  }
+
+  const { id } = req.body;
+  if (!id) return res.status(400).send('Missing user id.');
+
+  getDeptHeadDepartmentId(req, (err, departmentId) => {
+    if (err) return res.status(500).send('Error resolving department.');
+
+    const query = `
+      DELETE FROM users
+      WHERE id = ? AND department_id = ?
+    `;
+    db.query(query, [id, departmentId], (qErr, result) => {
+      if (qErr) return res.status(500).send('Error deleting user.');
+      if (result.affectedRows === 0) {
+        return res.status(403).send('Delete denied or user not in your department.');
+      }
+      res.sendStatus(200);
+    });
+  });
+});
+
 
 
 
