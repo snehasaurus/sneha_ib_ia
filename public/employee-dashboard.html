@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body style="background-color: #a2c2f4; font-family: Arial, sans-serif;">
+
+  <h1 style="text-align: center; font-size: 32px; margin-top: 20px;">Employee Dashboard</h1>
+
+  <!-- Budget Approval Status Table -->
+  <h2 style="text-align: center; margin-top: 30px;">BUDGET APPROVAL STATUS</h2>
+  <table border="1" cellpadding="10" style="width: 80%; margin: 20px auto; border-collapse: collapse; text-align: center;">
+    <thead style="background-color: #4b7bec; color: white;">
+      <tr>
+        <th>Department</th>
+        <th>Department Head</th>
+        <th>Amount</th>
+        <th>Approve/Deny</th>
+        <th>Comments</th>
+      </tr>
+    </thead>
+    <tbody id="budget-status-table" style="background-color: white;"></tbody>
+  </table>
+
+  <!-- Planned vs Actual Spending Graph -->
+  <h3 style="text-align: center; margin-top: 40px;">Planned vs Actual Spending</h3>
+  <canvas id="spendingChart" width="400" height="200" style="margin: 0 auto; display: block; background-color: white; padding: 20px; border-radius: 8px;"></canvas>
+
+  <script>
+    async function fetchEmployeeDashboard() {
+      try {
+        const res = await fetch('/api/employee-dashboard-data');
+        const data = await res.json();
+
+        // === Fill Budget Approval Table ===
+        const table = document.getElementById('budget-status-table');
+        table.innerHTML = '';
+        if (data.department) {
+          const row = data.department;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${row.department_name}</td>
+            <td>${row.department_head}</td>
+            <td>₹${Number(row.requested_budget).toLocaleString()}</td>
+            <td>${row.budget_status || '—'}</td>
+            <td>${row.admin_comments || '—'}</td>
+          `;
+          table.appendChild(tr);
+        }
+
+        // === Create Graph (Planned vs Actual) ===
+        if (data.spending) {
+          const planned = Number(data.spending.requested_budget);
+          const actual = Number(data.spending.actual_spent);
+
+          const ctx = document.getElementById('spendingChart').getContext('2d');
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: [data.spending.department_name],
+              datasets: [
+                {
+                  label: 'Planned Spending',
+                  data: [planned],
+                  backgroundColor: '#FF6384',
+                  borderColor: '#FF6384',
+                  borderWidth: 1
+                },
+                {
+                  label: 'Actual Spending',
+                  data: [actual],
+                  backgroundColor: '#36A2EB',
+                  borderColor: '#36A2EB',
+                  borderWidth: 1
+                }
+              ]
+            },
+            options: {
+              scales: {
+                y: { beginAtZero: true }
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching employee dashboard data:', err);
+      }
+    }
+
+    fetchEmployeeDashboard();
+  </script>
+</body>
+</html>

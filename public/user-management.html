@@ -10,6 +10,12 @@
 
   <div style="width: 80%; margin: 20px auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
   <label>
+    <div style="width: 80%; margin: 10px auto; text-align: right;">
+  <button onclick="addUser()" style="padding: 8px 16px; background-color: #4b7bec; color: white; border: none; border-radius: 5px; cursor: pointer;">
+    ➕ Add User
+  </button>
+</div>
+
     Filter by Department:
     <select id="department-filter">
       <option value="all">All Departments</option>
@@ -52,6 +58,9 @@
   </table>
 
   <script>
+    const departmentOptions = ['Marketing', 'Finance', 'HR', 'IT', 'Test Department'];
+const roleOptions = ['Admin', 'Department Head', 'General Employee'];
+
     let users = [];
     let sortAsc = true;
 
@@ -143,18 +152,33 @@
     }
 
     function editUser(id, username, role, departmentName) {
-      const newUsername = prompt('Edit username:', username);
-      const newRole = prompt('Edit role (admin / General Employee / Department Head):', role);
-      const newDepartment = prompt('Edit department name:', departmentName);
+  // Username edit stays text-based
+  const newUsername = prompt('Edit username:', username);
+  if (!newUsername) return;
 
-      if (!newUsername || !newRole || !newDepartment) return;
+  // Create dropdowns
+  const newRole = promptDropdown('Select role:', roleOptions, role);
+  const newDepartment = promptDropdown('Select department:', departmentOptions, departmentName);
 
-      fetch('/api/users/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, username: newUsername, role: newRole, department_name: newDepartment })
-      }).then(() => fetchUsers());
-    }
+  if (!newRole || !newDepartment) {
+    alert('You must select both role and department.');
+    return;
+  }
+
+  fetch('/api/users/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, username: newUsername, role: newRole, department_name: newDepartment })
+  }).then(() => fetchUsers());
+}
+
+// Helper to show dropdown via prompt-like approach
+function promptDropdown(label, options, current) {
+  const display = options.map((opt, i) => `${i + 1}. ${opt}`).join('\n');
+  const choice = prompt(`${label}\n${display}\n(Current: ${current})`);
+  const index = parseInt(choice);
+  return isNaN(index) || index < 1 || index > options.length ? null : options[index - 1];
+}
 
     function deleteUser(id) {
       if (!confirm('Are you sure you want to delete this user?')) return;
@@ -165,6 +189,45 @@
         body: JSON.stringify({ id })
       }).then(() => fetchUsers());
     }
+async function addUser() {
+  const username = prompt('Enter username:');
+  const email = prompt('Enter email:');
+  const password = prompt('Enter password:'); // will be hashed in backend
+
+  if (!username || !email || !password) {
+    alert('Username, email, and password are required.');
+    return;
+  }
+
+  // Dropdowns for role and department
+  const role = promptDropdown('Select role:', roleOptions, '');
+  const department = promptDropdown('Select department:', departmentOptions, '');
+
+  if (!role || !department) {
+    alert('You must select both role and department.');
+    return;
+  }
+
+  const newUser = { username, email, password, role, department_name: department };
+
+  try {
+    const res = await fetch('/api/users/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newUser)
+    });
+
+    if (res.ok) {
+      alert('✅ User added successfully!');
+      fetchUsers(); // refresh table
+    } else {
+      alert('❌ Failed to add user.');
+    }
+  } catch (err) {
+    console.error('Error adding user:', err);
+    alert('An error occurred while adding the user.');
+  }
+}
 
     fetchUsers();
   </script>

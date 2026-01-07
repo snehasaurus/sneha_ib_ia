@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Department Expenditures</title>
+</head>
+<body style="background-color: #a2c2f4; font-family: Arial, sans-serif;">
+
+  <h1 style="text-align: center; font-size: 32px; margin-top: 20px;">Department Expenditures</h1>
+
+  <h2 style="text-align: center; margin-top: 30px;">SPENDING TRACKER</h2>
+
+  <table border="1" cellpadding="10" style="width: 80%; margin: 20px auto; border-collapse: collapse; text-align: center;">
+    <thead style="background-color: #4b7bec; color: white;">
+      <tr>
+        <th>Serial No.</th>
+        <th>Expenditure Purpose</th>
+        <th>Expenditure Amount</th>
+        <th>Date</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody id="expenditures-table"></tbody>
+  </table>
+
+  <div style="text-align: center; margin-top: 20px;">
+    <button onclick="showAddForm()">Add Expenditure</button>
+  </div>
+
+  <!-- Hidden Add Expenditure Form -->
+  <div id="add-form" style="display: none; margin: 20px auto; width: 50%; text-align: center; background: #fff; padding: 20px; border-radius: 8px;">
+    <h3>Add Expenditure</h3>
+    <label>Expenditure Purpose: <input type="text" id="expenditure-name"></label><br><br>
+    <label>Expenditure Amount: <input type="number" id="expenditure-amount" step="0.01"></label><br><br>
+    <label>Date: <input type="date" id="expenditure-date"></label><br><br>
+    <button onclick="addExpenditure()">Save</button>
+    <button onclick="hideAddForm()">Cancel</button>
+  </div>
+
+  <script>
+    let expenditures = [];
+
+    // Fetch expenditures for this department
+    async function fetchExpenditures() {
+      try {
+        const res = await fetch('/api/department-head/expenditures');
+        const data = await res.json();
+        expenditures = data;
+        renderExpenditures(data);
+      } catch (err) {
+        console.error('Error fetching expenditures:', err);
+      }
+    }
+
+    function renderExpenditures(data) {
+      const table = document.getElementById('expenditures-table');
+      table.innerHTML = '';
+      data.forEach((exp, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${exp.expenditure_name}</td>
+          <td>${Number(exp.expenditure_amount).toLocaleString()}</td>
+          <td>${new Date(exp.date).toLocaleDateString()}</td>
+          <td><button onclick="deleteExpenditure(${exp.expenditure_id})">Delete</button></td>
+        `;
+        table.appendChild(tr);
+      });
+    }
+
+    function showAddForm() {
+      document.getElementById('add-form').style.display = 'block';
+    }
+
+    function hideAddForm() {
+      document.getElementById('add-form').style.display = 'none';
+    }
+
+    async function addExpenditure() {
+      const name = document.getElementById('expenditure-name').value;
+      const amount = document.getElementById('expenditure-amount').value;
+      const date = document.getElementById('expenditure-date').value;
+
+      if (!name || !amount || !date) {
+        alert('Please fill all fields.');
+        return;
+      }
+
+      const res = await fetch('/api/department-head/expenditures/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expenditure_name: name, expenditure_amount: amount, date })
+      });
+
+      if (res.ok) {
+        hideAddForm();
+        fetchExpenditures();
+      } else {
+        alert('Error adding expenditure.');
+      }
+    }
+
+    async function deleteExpenditure(id) {
+      if (!confirm('Are you sure you want to delete this expenditure?')) return;
+
+      const res = await fetch('/api/department-head/expenditures/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+
+      if (res.ok) {
+        fetchExpenditures();
+      } else {
+        alert('Error deleting expenditure.');
+      }
+    }
+
+    fetchExpenditures();
+  </script>
+</body>
+</html>

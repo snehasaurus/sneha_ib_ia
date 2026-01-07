@@ -96,35 +96,148 @@
         });
       });
 
-    function generatePDF(row) {
-      const content = document.getElementById('pdf-content');
-      html2canvas(content, { useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'pt', 'a4');
-        const width = pdf.internal.pageSize.getWidth();
-        const height = (canvas.height * width) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 20, 20, width - 40, height - 60);
-        pdf.save(`${row.department_name}_Budget_Report.pdf`);
-      });
-    }
+   //REPLACE IF SOMETHING GOES WRONG IN THE CURRENT CODE 
+      // function generatePDF(row) {
+    //   const content = document.getElementById('pdf-content');
+    //   html2canvas(content, { useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+    //     const imgData = canvas.toDataURL('image/png');
+    //     const { jsPDF } = window.jspdf;
+    //     const pdf = new jsPDF('p', 'pt', 'a4');
+    //     const width = pdf.internal.pageSize.getWidth();
+    //     const height = (canvas.height * width) / canvas.width;
+    //     pdf.addImage(imgData, 'PNG', 20, 20, width - 40, height - 60);
+    //     pdf.save(`${row.department_name}_Budget_Report.pdf`);
+    //   });
+    // }
+
+    async function generatePDF(row) {
+  // 1. Populate text fields
+  document.getElementById('pdf-dept-name').textContent = row.department_name;
+  document.getElementById('pdf-department-name').textContent = row.department_name;
+  document.getElementById('pdf-department-head').textContent = row.department_head;
+  document.getElementById('pdf-requested-amount').textContent = row.requested_budget;
+  document.getElementById('pdf-budget-status').textContent = row.budget_status || '—';
+  document.getElementById('pdf-admin-comments').textContent = row.admin_comments || '—';
+  document.getElementById('pdf-email').textContent = "contact@" + row.department_name.toLowerCase() + ".com"; // example
+
+  // 2. Re-render pie chart inside the PDF template
+  const chartCanvas = document.getElementById("pdf-chart").getContext("2d");
+  if (pdfChartInstance) {
+    pdfChartInstance.destroy();
+  }
+  pdfChartInstance = new Chart(chartCanvas, {
+    type: 'pie',
+    data: {
+      labels: window.chartLabels,
+      datasets: [{
+        label: 'Budget Share',
+        data: window.chartValues,
+        backgroundColor: [
+          '#FF6384', '#36A2EB', '#FFCE56', '#66BB6A',
+          '#BA68C8', '#FFA07A', '#90CAF9', '#F06292'
+        ],
+        borderColor: '#ffffff',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'right' },
+        datalabels: {
+          color: '#fff',
+          font: { weight: 'bold', size: 14 },
+          formatter: (value, ctx) => {
+            const label = ctx.chart.data.labels[ctx.dataIndex];
+            const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            return `${label}\n${((value / total) * 100).toFixed(1)}%`;
+          }
+        }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+
+  // 3. Wait a tick so chart renders
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // 4. Convert hidden DOM → canvas → PDF
+  const content = document.getElementById('pdf-content');
+  html2canvas(content, { useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'pt', 'a4');
+    const width = pdf.internal.pageSize.getWidth();
+    const height = (canvas.height * width) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 20, 20, width - 40, height - 60);
+    pdf.save(`${row.department_name}_Budget_Report.pdf`);
+  });
+}
+
 
     // ✅ FIXED: This now just sends department data to backend.
-    async function emailPDFToUser(row) {
-      try {
-        const response = await fetch('/email-budget-report', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(row)
-        });
+   async function emailPDFToUser(row) {
+  try {
+    // 1. Populate PDF content (reuse same logic as generatePDF)
+    document.getElementById('pdf-dept-name').textContent = row.department_name;
+    document.getElementById('pdf-department-name').textContent = row.department_name;
+    document.getElementById('pdf-department-head').textContent = row.department_head;
+    document.getElementById('pdf-requested-amount').textContent = row.requested_budget;
+    document.getElementById('pdf-budget-status').textContent = row.budget_status || '—';
+    document.getElementById('pdf-admin-comments').textContent = row.admin_comments || '—';
+    document.getElementById('pdf-email').textContent = "contact@" + row.department_name.toLowerCase() + ".com";
 
-        const result = await response.text();
-        alert(result);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to send email.");
-      }
-    }
+    // 2. Re-render pie chart
+    const chartCanvas = document.getElementById("pdf-chart").getContext("2d");
+    if (pdfChartInstance) pdfChartInstance.destroy();
+    pdfChartInstance = new Chart(chartCanvas, {
+      type: 'pie',
+      data: {
+        labels: window.chartLabels,
+        datasets: [{
+          data: window.chartValues,
+          backgroundColor: [
+            '#FF6384', '#36A2EB', '#FFCE56', '#66BB6A',
+            '#BA68C8', '#FFA07A', '#90CAF9', '#F06292'
+          ],
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: { plugins: { legend: { position: 'right' } } }
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // 3. Convert to PDF → base64
+    const content = document.getElementById('pdf-content');
+    const canvas = await html2canvas(content, { useCORS: true, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'pt', 'a4');
+    const width = pdf.internal.pageSize.getWidth();
+    const height = (canvas.height * width) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 20, 20, width - 40, height - 60);
+
+    // Get base64 string
+    const pdfBase64 = pdf.output('datauristring').split(',')[1];
+
+    // 4. Send to backend
+    const response = await fetch('/email-budget-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64, department_name: row.department_name })
+      
+    });
+
+    
+    const result = await response.text();
+    alert(result);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to send email.");
+  }
+}
+
 
     window.generatePDF = generatePDF;
   </script>

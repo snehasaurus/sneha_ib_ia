@@ -41,59 +41,112 @@
 
     <script>
         // Function to fetch data for the table and graph from the server
+        // fetch('/admin-dashboard-data')
+        //     .then(response => response.json())
+        //     .then(data => {
+        //         // Populate table with department data
+        //         const tableBody = document.getElementById('department-table');
+        //         data.departments.forEach(department => {
+        //             const row = document.createElement('tr');
+        //             row.innerHTML = `
+        //                 <td style="padding: 12px;">${department.department_name}</td>
+        //                 <td style="padding: 12px;">${department.department_head}</td>
+        //                 <td style="padding: 12px;">${department.requested_budget}</td>
+        //                 <td style="padding: 12px;">${department.admin_comments || 'No comments'}</td>
+        //             `;
+        //             tableBody.appendChild(row);
+        //         });
+
+        //         // Prepare data for the graph
+        //         const labels = data.departments.map(dep => dep.department_name);
+        //         const plannedData = data.departments.map(dep => dep.requested_budget);
+        //         const actualData = data.expenditures.map(exp => exp.actual_spent);
+
+        //         // Create the graph using Chart.js
+        //         const ctx = document.getElementById('spendingChart').getContext('2d');
+        //         new Chart(ctx, {
+        //             type: 'bar',
+        //             data: {
+        //                 labels: labels,
+        //                 datasets: [
+        //                     {
+        //                         label: 'Planned Spending',
+        //                         data: plannedData,
+        //                         backgroundColor: '#FF6384',
+        //                         borderColor: '#FF6384',
+        //                         borderWidth: 1
+        //                     },
+        //                     {
+        //                         label: 'Actual Spending',
+        //                         data: actualData,
+        //                         backgroundColor: '#36A2EB',
+        //                         borderColor: '#36A2EB',
+        //                         borderWidth: 1
+        //                     }
+        //                 ]
+        //             },
+        //             options: {
+        //                 scales: {
+        //                     y: {
+        //                         beginAtZero: true
+        //                     }
+        //                 }
+        //             }
+        //         });
+        //     });
+
         fetch('/admin-dashboard-data')
-            .then(response => response.json())
-            .then(data => {
-                // Populate table with department data
-                const tableBody = document.getElementById('department-table');
-                data.departments.forEach(department => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td style="padding: 12px;">${department.department_name}</td>
-                        <td style="padding: 12px;">${department.department_head}</td>
-                        <td style="padding: 12px;">${department.requested_budget}</td>
-                        <td style="padding: 12px;">${department.admin_comments || 'No comments'}</td>
-                    `;
-                    tableBody.appendChild(row);
-                });
+  .then(response => response.json())
+  .then(data => {
+    // Populate table
+    const tableBody = document.getElementById('department-table');
+    data.forEach(department => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td style="padding: 12px;">${department.department_name}</td>
+        <td style="padding: 12px;">${department.department_head}</td>
+        <td style="padding: 12px;">${department.requested_budget}</td>
+        <td style="padding: 12px;">${department.admin_comments || 'No comments'}</td>
+      `;
+      tableBody.appendChild(row);
+    });
 
-                // Prepare data for the graph
-                const labels = data.departments.map(dep => dep.department_name);
-                const plannedData = data.departments.map(dep => dep.requested_budget);
-                const actualData = data.expenditures.map(exp => exp.actual_spent);
+    // Graph data
+    const labels = data.map(dep => dep.department_name);
+    const plannedData = data.map(dep => dep.requested_budget);
+    const actualData = data.map(dep => dep.actual_spent);
 
-                // Create the graph using Chart.js
-                const ctx = document.getElementById('spendingChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: 'Planned Spending',
-                                data: plannedData,
-                                backgroundColor: '#FF6384',
-                                borderColor: '#FF6384',
-                                borderWidth: 1
-                            },
-                            {
-                                label: 'Actual Spending',
-                                data: actualData,
-                                backgroundColor: '#36A2EB',
-                                borderColor: '#36A2EB',
-                                borderWidth: 1
-                            }
-                        ]
-                    },
-                    options: {
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
-                    }
-                });
-            });
+    // Chart
+    const ctx = document.getElementById('spendingChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Planned Spending',
+            data: plannedData,
+            backgroundColor: '#FF6384',
+            borderColor: '#FF6384',
+            borderWidth: 1
+          },
+          {
+            label: 'Actual Spending',
+            data: actualData,
+            backgroundColor: '#36A2EB',
+            borderColor: '#36A2EB',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  });
+
     </script>
 </body>
 </html>

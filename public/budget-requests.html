@@ -5,6 +5,10 @@
   <title>Budget Requests and Approvals</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+<p style="text-align:center; font-size:14px; color:#333;">
+  <b>Status codes:</b> A = Approved, D = Denied, P = Pending
+</p>
+
 <body style="background-color: #a2c2f4; font-family: Arial, sans-serif;">
 
   <h1 style="text-align: center; font-size: 32px; margin-top: 20px;">budget requests and approvals</h1>
@@ -24,57 +28,137 @@
 
   <script>
     // Fetch and display department data
+    // fetch('/admin-dashboard-data')
+    //   .then(res => res.json())
+    //   .then(data => {
+    //     const table = document.getElementById('budget-table');
+    //     data.departments.forEach(row => {
+    //       const tr = document.createElement('tr');
+
+    //       // Format budget status
+    //       const statusCell = row.budget_status
+    //         ? `${row.budget_status} <br><button onclick="editStatus('${row.department_id}', '${row.budget_status}')">Edit status?</button>`
+    //         : `<button onclick="editStatus('${row.department_id}', '')">Add status?</button>`;
+
+    //       // Format admin comment
+    //       const commentCell = row.admin_comments
+    //         ? `${row.admin_comments} <br><button onclick="editComment('${row.department_id}', \`${row.admin_comments}\`)">Edit comment?</button>`
+    //         : `<button onclick="editComment('${row.department_id}', '')">Add comment?</button>`;
+
+    //       tr.innerHTML = `
+    //         <td>${row.department_name}</td>
+    //         <td>${row.department_head}</td>
+    //         <td>$${row.requested_budget}</td>
+    //         <td>${statusCell}</td>
+    //         <td>${commentCell}</td>
+    //       `;
+    //       table.appendChild(tr);
+    //     });
+    //   });
     fetch('/admin-dashboard-data')
-      .then(res => res.json())
-      .then(data => {
-        const table = document.getElementById('budget-table');
-        data.departments.forEach(row => {
-          const tr = document.createElement('tr');
+  .then(res => res.json())
+  .then(data => {
+    const table = document.getElementById('budget-table');
+    data.forEach(row => {   // ✅ data is the array directly now
+      const tr = document.createElement('tr');
 
-          // Format budget status
-          const statusCell = row.budget_status
-            ? `${row.budget_status} <br><button onclick="editStatus('${row.department_id}', '${row.budget_status}')">Edit status?</button>`
-            : `<button onclick="editStatus('${row.department_id}', '')">Add status?</button>`;
+      // Format budget status
+      const statusCell = row.budget_status
+        ? `${row.budget_status} <br><button onclick="editStatus('${row.department_id}', '${row.budget_status}')">Edit status?</button>`
+        : `<button onclick="editStatus('${row.department_id}', '')">Add status?</button>`;
 
-          // Format admin comment
-          const commentCell = row.admin_comments
-            ? `${row.admin_comments} <br><button onclick="editComment('${row.department_id}', \`${row.admin_comments}\`)">Edit comment?</button>`
-            : `<button onclick="editComment('${row.department_id}', '')">Add comment?</button>`;
+      // Format admin comment
+      const commentCell = row.admin_comments
+        ? `${row.admin_comments} <br><button onclick="editComment('${row.department_id}', \`${row.admin_comments}\`)">Edit comment?</button>`
+        : `<button onclick="editComment('${row.department_id}', '')">Add comment?</button>`;
 
-          tr.innerHTML = `
-            <td>${row.department_name}</td>
-            <td>${row.department_head}</td>
-            <td>$${row.requested_budget}</td>
-            <td>${statusCell}</td>
-            <td>${commentCell}</td>
-          `;
-          table.appendChild(tr);
-        });
-      });
+      tr.innerHTML = `
+        <td>${row.department_name}</td>
+        <td>${row.department_head}</td>
+        <td>₹${row.requested_budget}</td>
+        <td>${statusCell}</td>
+        <td>${commentCell}</td>
+      `;
+      table.appendChild(tr);
+    });
+  });
+
 
     // Add or edit budget status
-    function editStatus(deptId, currentStatus) {
-      const newStatus = prompt('Enter status (Approved / Denied / Pending):', currentStatus);
-      if (newStatus !== null && newStatus.trim() !== '') {
-        fetch('/update-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ department_id: deptId, status: newStatus })
-        }).then(() => location.reload());
-      }
+   function editStatus(deptId, currentStatus) {
+  // Show user-friendly current status (map DB letters to words)
+  const mapLetterToWord = { A: 'Approved', D: 'Denied', P: 'Pending' };
+  const currentWord = mapLetterToWord[currentStatus] || currentStatus || '';
+
+  const raw = prompt(
+    `Enter new status for department ${deptId}:\nUse A / D / P or Approved / Denied / Pending`,
+    currentWord
+  );
+
+  if (raw === null) return; // user cancelled
+
+  const input = raw.trim().toLowerCase();
+  if (!input) return alert('No status entered.');
+
+  // Normalize input to single-letter codes
+  let newStatusLetter = null;
+  if (input === 'a' || input === 'approved') newStatusLetter = 'A';
+  else if (input === 'd' || input === 'denied') newStatusLetter = 'D';
+  else if (input === 'p' || input === 'pending') newStatusLetter = 'P';
+  else return alert('Invalid status. Use A, D, P or Approved, Denied, Pending.');
+
+  // optional: confirm
+  if (!confirm(`Change status for dept ${deptId} to "${newStatusLetter}"?`)) return;
+
+  // send to server
+  fetch('/update-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ department_id: deptId, status: newStatusLetter })
+  })
+  .then(async res => {
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(text || `Status update failed (HTTP ${res.status})`);
     }
+    alert('Status updated successfully!');
+    // Ideally re-fetch the table instead of reload; reload is simplest
+    location.reload();
+  })
+  .catch(err => {
+    console.error('Status update error:', err);
+    alert('Error updating status: ' + err.message);
+  });
+}
+
 
     // Add or edit admin comment
     function editComment(deptId, currentComment) {
-      const newComment = prompt('Enter your comment:', currentComment);
-      if (newComment !== null && newComment.trim() !== '') {
-        fetch('/update-comment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ department_id: deptId, comment: newComment })
-        }).then(() => location.reload());
-      }
+  const newComment = prompt('Enter your comment:', currentComment || '');
+  if (newComment === null) return; // cancelled
+
+  const trimmed = newComment.trim();
+  if (trimmed === '') return alert('Comment cannot be empty.');
+
+  // send to server
+  fetch('/update-comment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ department_id: deptId, comment: trimmed })
+  })
+  .then(async res => {
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(text || `Comment update failed (HTTP ${res.status})`);
     }
+    alert('Comment updated successfully!');
+    location.reload();
+  })
+  .catch(err => {
+    console.error('Comment update error:', err);
+    alert('Error updating comment: ' + err.message);
+  });
+}
   </script>
 </body>
 </html>
